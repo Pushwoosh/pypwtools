@@ -1,0 +1,86 @@
+#!/usr/bin/env python3
+
+import argparse
+import os.path
+import urllib.parse
+import zipfile
+import time
+import requests
+from dotenv import load_dotenv
+from os import _exit as exit
+
+import const
+from helpers import utils, auth
+
+load_dotenv()
+
+parser = argparse.ArgumentParser(description='Export devices segment to CSV.')
+auth.cmdline_setup(parser)
+parser.add_argument('-c', '--count', action='store_true',
+                    help='do not export data, only show amount of devices in segment',
+                    default=False)
+parser.add_argument('-x', '--no-extract', action='store_true',
+                    help='do not extract zip archive')
+parser.add_argument('seglang', help='seglang filter expression')
+args = parser.parse_args()
+
+auth.cmdline_validate(parser, args)
+
+#####
+
+request = {
+  'auth': args.token,
+  'filterExpression': args.seglang,
+  'exportCsv': not args.count,
+}
+
+resp = requests.post(const.URL_EXPORT_SEGMENT, json=request)
+
+if resp.status_code != 200:
+    print("error: " + str(resp.status_code) + ": " + resp.text)
+    exit(1)
+
+json = resp.json()
+task_id = int(json['task_id'])
+
+print("task id: %d" % task_id)
+print("waiting for the export to complete..")
+
+segmentSize = 0
+exportFileUrl = 0
+
+while True:
+    request = {'auth': args.token, 'task_id': str(task_id)}
+    resp = requests.post(const.URL_EXPORT_SEGMENT_RESULT, json=request)
+    if resp.status_code != 200:
+        print("error getting status: " + resp.text)
+        exit(1)
+    else:
+        json = resp.json()
+        status = json['status']
+        if status == 'in-progress':
+            utils.draw_progress(100, int(json['progress']))
+        if status == 'completed':
+            utils.draw_progress(100, 100)
+            segmentSize = int(json['devices_count'])
+            exportFileUrl = json['csv_filename']
+            break
+        if status == 'failed':
+            exit(1)
+    time.sleep(1)
+
+print("")
+print("segment size: %d" % segmentSize)
+
+if not args.count:
+    # parse filename from url
+    url = urllib.parse.urlparse(exportFileUrl)
+    filename = os.path.basename(url.path)
+    print("downloading segment file: %s to %s" % (exportFileUrl, filename))
+    utils.download_file(exportFileUrl, filename)
+
+    if not args.no_extract:
+        print("extracting zip archive")
+        with zipfile.ZipFile(filename, 'r') as zipf:
+            zipf.printdir()
+            zipf.extractall(".")
