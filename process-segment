@@ -1,0 +1,122 @@
+#!/usr/bin/env python3
+
+import argparse
+import csv
+import threading
+import time
+
+import requests
+from dotenv import load_dotenv
+from concurrent.futures import ThreadPoolExecutor
+
+import const
+import helpers.utils
+from helpers import auth, device
+from helpers import csv as hcsv
+
+load_dotenv()
+
+parser = argparse.ArgumentParser(description='Iterate export file and process devices')
+auth.cmdline_setup(parser)
+parser.add_argument('-a', '--action',
+                    required=True,
+                    help='acton to execute. possible values: registerDevice, setTags, unregisterDevice, deleteDevice')
+parser.add_argument('-c', '--concurrency',
+                    default=20,
+                    type=int,
+                    help="amount of concurrent threads. default: 1, max: 100")
+parser.add_argument('--app', required=True,
+                    help='application code')
+parser.add_argument('segment', help='segment file to process')
+args = parser.parse_args()
+
+auth.cmdline_validate(parser, args)
+
+
+class State:
+    concurrency = 0
+    total_lines = 0
+    processed_lines = 0
+    currently_processing_lines = 0
+    done = False
+
+
+state = State()
+state.concurrency = args.concurrency
+
+
+def iterate_csv(filename: str, cb):
+    print("iterating " + filename)
+
+    state.total_lines = sum(1 for _ in open(filename))
+    state.processed_lines = 0
+    state.done = False
+
+    def progress():
+        while not state.done:
+            helpers.utils.draw_progress(state.total_lines, state.processed_lines)
+            time.sleep(1)
+
+    progress_thread = threading.Thread(target=progress)
+    progress_thread.start()
+
+    executor = ThreadPoolExecutor(max_workers=state.concurrency)
+    with open(filename, newline="") as csvin:
+        reader = csv.reader(csvin)
+        struct = hcsv.parse_struct(reader.__next__())
+        for _row in reader:
+            row = hcsv.Row(struct, _row)
+            dev = device.from_row(row)
+            executor.submit(cb, dev)
+    executor.shutdown(True)
+    state.done = True
+    progress_thread.join()
+
+
+def register_device():
+    session = requests.session()
+    def call(dev: device.Device):
+        request = {
+            "application": args.app,
+            "hwid": dev.hwid,
+            "device_type": dev.type,
+            "push_token": dev.push_token,
+        }
+
+        resp = session.post(const.URL_REGISTER_DEVICE, json={"request": request})
+        if resp.status_code != 200:
+            print(dev.hwid + ":" + resp.text)
+
+        state.processed_lines = state.processed_lines + 1
+
+    iterate_csv(args.segment, call)
+
+
+def set_tags():
+    def call(dev: device.Device):
+        pass
+    iterate_csv(args.segment, call)
+
+
+def unregister_device():
+    def call(dev: device.Device):
+        pass
+    iterate_csv(args.segment, call)
+
+
+def delete_device():
+    def call(dev: device.Device):
+        pass
+    iterate_csv(args.segment, call)
+
+
+if args.action == "registerDevice":
+    register_device()
+elif args.action == 'setTags':
+    set_tags()
+elif args.action == 'unregisterDevice':
+    unregister_device()
+elif args.action == 'deleteDevice':
+    delete_device()
+else:
+    parser.error("unknown action: " + args.action)
