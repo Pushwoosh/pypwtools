@@ -5,7 +5,7 @@ class Device:
     hwid = ""
     user_id = ""
     push_token = ""
-    type = 0
+    platform = 0
     tags = {}
 
     def __str__(self):
@@ -19,8 +19,8 @@ class Device:
         if self.push_token != "":
             ret += "push_token: " + self.push_token + "\n"
 
-        if self.type != "":
-            ret += "type: " + str(self.type) + "\n"
+        if self.platform != "":
+            ret += "type: " + str(self.platform) + "\n"
 
         if len(self.tags) > 0:
             ret += "tags: \n"
@@ -35,6 +35,6 @@ def from_row(row: Row) -> Device:
     ret.hwid = row.hwid()
     ret.user_id = row.user_id()
     ret.push_token = row.push_token()
-    ret.type = row.type()
+    ret.platform = row.type()
     ret.tags = row.tags()
     return ret

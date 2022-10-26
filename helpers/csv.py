@@ -89,5 +89,7 @@ class Row:
         """
         ret = {}
         for tag in self.struct.tags:
+            if tag == 'Type (humanized)':
+                continue
             ret[tag] = self.data[self.struct.tags[tag]]
         return ret

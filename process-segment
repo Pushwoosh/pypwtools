@@ -14,8 +14,14 @@ import helpers.utils
 from helpers import auth, device
 from helpers import csv as hcsv
 
+# uncomment to show verbose logs from requests lib
+# import logging, requests, timeit
+# logging.basicConfig(level=logging.DEBUG, format="%(message)s")
+
+# load environment file
 load_dotenv()
 
+# configure argparse
 parser = argparse.ArgumentParser(description='Iterate export file and process devices')
 auth.cmdline_setup(parser)
 parser.add_argument('-a', '--action',
@@ -32,6 +38,9 @@ args = parser.parse_args()
 
 auth.cmdline_validate(parser, args)
 
+# create single requests session to allow the library to reuse tcp connections
+session = requests.session()
+
 
 class State:
     concurrency = 0
@@ -46,21 +55,27 @@ state.concurrency = args.concurrency
 
 
 def iterate_csv(filename: str, cb):
-    print("iterating " + filename)
-
+    # calculate amount of lines in a file
     state.total_lines = sum(1 for _ in open(filename))
-    state.processed_lines = 0
-    state.done = False
 
+    # do not count csv header as a device
+    if state.total_lines > 1:
+        state.total_lines = state.total_lines - 1
+
+    print("processing %d lines in %s using %d threads" % (state.total_lines, filename, state.concurrency))
+
+    # progress drawing thread
     def progress():
         while not state.done:
             helpers.utils.draw_progress(state.total_lines, state.processed_lines)
             time.sleep(1)
-
     progress_thread = threading.Thread(target=progress)
     progress_thread.start()
 
+    # start executor threads
     executor = ThreadPoolExecutor(max_workers=state.concurrency)
+
+    # put job into the thread pool for each device
     with open(filename, newline="") as csvin:
         reader = csv.reader(csvin)
         struct = hcsv.parse_struct(reader.__next__())
@@ -68,18 +83,21 @@ def iterate_csv(filename: str, cb):
             row = hcsv.Row(struct, _row)
             dev = device.from_row(row)
             executor.submit(cb, dev)
-    executor.shutdown(True)
-    state.done = True
-    progress_thread.join()
+
+    executor.shutdown(True)  # terminate executors threads
+    state.done = True  # set done flag to true to let progress thread know that it can exit
+    progress_thread.join()  # cleanup progress thread
+    # most likely the progress will never reach 100% because it refreshes once in a second.
+    # this final draw call guarantees that we will see 100%
+    helpers.utils.draw_progress(state.total_lines, state.processed_lines)
 
 
 def register_device():
-    session = requests.session()
     def call(dev: device.Device):
         request = {
             "application": args.app,
             "hwid": dev.hwid,
-            "device_type": dev.type,
+            "device_type": dev.platform,
             "push_token": dev.push_token,
         }
 
@@ -94,19 +112,51 @@ def register_device():
 
 def set_tags():
     def call(dev: device.Device):
-        pass
+        request = {
+            "application": args.app,
+            "device_type": dev.platform,
+            "hwid": dev.hwid,
+            "tags": dev.tags,
+        }
+
+        resp = session.post(const.URL_SET_TAGS, json={"request": request})
+        if resp.status_code != 200:
+            print(dev.hwid + ":" + resp.text)
+
+        state.processed_lines = state.processed_lines + 1
+
     iterate_csv(args.segment, call)
 
 
 def unregister_device():
     def call(dev: device.Device):
-        pass
+        request = {
+            "application": args.app,
+            "hwid": dev.hwid,
+        }
+
+        resp = session.post(const.URL_UNREGISTER_DEVICE, json={"request": request})
+        if resp.status_code != 200:
+            print(dev.hwid + ":" + resp.text)
+
+        state.processed_lines = state.processed_lines + 1
+
     iterate_csv(args.segment, call)
 
 
 def delete_device():
     def call(dev: device.Device):
-        pass
+        request = {
+            "application": args.app,
+            "hwid": dev.hwid,
+        }
+
+        resp = session.post(const.URL_DELETE_DEVICE, json={"request": request})
+        if resp.status_code != 200:
+            print(dev.hwid + ":" + resp.text)
+
+        state.processed_lines = state.processed_lines + 1
+
     iterate_csv(args.segment, call)
 
 
