@@ -56,4 +56,19 @@ Example:
 ./export-segment 'A("00000-00000", [ios], [with_tokens]) * AT("00000-00000", "Last Application Open", daysago, gt, 3)' 
 ```
 
+Supports any [seglang](https://docs.pushwoosh.com/platform-docs/api-reference/messages#sets) expression.
+
 # process-segment
+
+This tool iterates over the given CSV file and performs some action. Possible actions:
+- registerDevice
+- setTags
+- unregisterDevice
+- deleteDevice
+
+Example:
+
+```commandline
+./process-segment -a registerDevice --app 00000-00000 export_segment_9A962-8ECD8_1666781735.csv
+```
+
