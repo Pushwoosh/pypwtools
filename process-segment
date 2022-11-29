@@ -100,8 +100,11 @@ def register_device():
             "device_type": dev.platform,
             "push_token": dev.push_token,
         }
+        headers = {
+            "no-auto-tags": "true",
+        }
 
-        resp = session.post(const.URL_REGISTER_DEVICE, json={"request": request})
+        resp = session.post(const.URL_REGISTER_DEVICE, json={"request": request}, headers=headers)
         if resp.status_code != 200:
             print(dev.hwid + ":" + resp.text)
 
@@ -118,8 +121,11 @@ def set_tags():
             "hwid": dev.hwid,
             "tags": dev.tags,
         }
+        headers = {
+            "no-auto-tags": "true"
+        }
 
-        resp = session.post(const.URL_SET_TAGS, json={"request": request})
+        resp = session.post(const.URL_SET_TAGS, json={"request": request}, headers=headers)
         if resp.status_code != 200:
             print(dev.hwid + ":" + resp.text)
 
