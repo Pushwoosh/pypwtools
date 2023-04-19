@@ -149,7 +149,8 @@ def unregister_device():
 
     iterate_csv(args.segment, call)
 
-
+# CAUTION: this method is not documented and only internal usage is intended.
+# It may stop working at any time without warning.
 def delete_device():
     def call(dev: device.Device):
         request = {

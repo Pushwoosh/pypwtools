@@ -64,7 +64,6 @@ This tool iterates over the given CSV file and performs some action. Possible ac
 - registerDevice
 - setTags
 - unregisterDevice
-- deleteDevice
 
 Example:
 
