@@ -118,7 +118,7 @@ def register_user():
         request = {
             "application": args.app,
             "hwid": dev.hwid,
-            "userId": dev.user,
+            "userId": dev.user_id,
         }
 
         resp = session.post(const.URL_REGISTER_USER, json={"request": request}, headers=headers)
