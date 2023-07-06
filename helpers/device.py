@@ -14,7 +14,7 @@ class Device:
             ret += "hwid: " + self.hwid + "\n"
 
         if self.user_id != "":
-            ret += "user id: " + self.user_id + "\n"
+            ret += "user_id: " + self.user_id + "\n"
 
         if self.push_token != "":
             ret += "push_token: " + self.push_token + "\n"

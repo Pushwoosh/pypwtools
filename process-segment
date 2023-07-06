@@ -113,6 +113,23 @@ def register_device():
     iterate_csv(args.segment, call)
 
 
+def register_user():
+    def call(dev: device.Device):
+        request = {
+            "application": args.app,
+            "hwid": dev.hwid,
+            "userId": dev.user_id,
+        }
+
+        resp = session.post(const.URL_REGISTER_USER, json={"request": request}, headers=headers)
+        if resp.status_code != 200:
+            print(dev.hwid + ":" + resp.text)
+
+        state.processed_lines = state.processed_lines + 1
+
+    iterate_csv(args.segment, call)
+
+
 def set_tags():
     def call(dev: device.Device):
         request = {
@@ -173,6 +190,8 @@ elif args.action == 'setTags':
     set_tags()
 elif args.action == 'unregisterDevice':
     unregister_device()
+elif args.action == 'registerUser':
+    register_user()
 elif args.action == 'deleteDevice':
     delete_device()
 else:
