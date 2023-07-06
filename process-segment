@@ -118,10 +118,7 @@ def register_user():
         request = {
             "application": args.app,
             "hwid": dev.hwid,
-            "userId": dev.platform,
-        }
-        headers = {
-            "no-auto-tags": "true",
+            "userId": dev.user,
         }
 
         resp = session.post(const.URL_REGISTER_USER, json={"request": request}, headers=headers)
