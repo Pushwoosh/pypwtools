@@ -26,7 +26,7 @@ parser = argparse.ArgumentParser(description='Iterate export file and process de
 auth.cmdline_setup(parser)
 parser.add_argument('-a', '--action',
                     required=True,
-                    help='acton to execute. possible values: registerDevice, setTags, unregisterDevice, deleteDevice, deleteDeviceAsync')
+                    help='acton to execute. possible values: registerDevice, registerUser, setTags, unregisterDevice, deleteDevice')
 parser.add_argument('-c', '--concurrency',
                     default=20,
                     type=int,
@@ -122,6 +122,10 @@ def register_user():
             "userId": dev.user_id,
         }
 
+        headers = {
+            "Authorization": f"Token {args.token}"
+        }
+
         resp = session.post(const.URL_REGISTER_USER, json={"request": request}, headers=headers)
         if resp.status_code != 200:
             print("HWID:" + dev.hwid + ", Error status code: " + str(resp.status_code) + ", Response: " + resp.text)
@@ -193,28 +197,6 @@ def delete_device():
 
     iterate_csv(args.segment, call)
 
-# CAUTION: this method is not documented and only internal usage is intended.
-# It may stop working at any time without warning.
-def delete_device_async():
-    
-    def call(dev: device.Device):
-        request = {
-            "application": args.app,
-            "hwid": dev.hwid,
-            }
-
-        headers = {
-            "Authorization": f"Token {args.token}"
-        }
-
-        resp = session.post(const.URL_DELETE_DEVICE_ASYNC, json=request, headers=headers)
-        if resp.status_code != 200:
-            print("HWID:" + dev.hwid + ", Error status code: " + str(resp.status_code) + ", Response: " + resp.text)
-
-        state.processed_lines = state.processed_lines + 1
-            
-    iterate_csv(args.segment, call)
-
 if args.action == "registerDevice":
     register_device()
 elif args.action == 'setTags':
@@ -225,7 +207,5 @@ elif args.action == 'registerUser':
     register_user()
 elif args.action == 'deleteDevice':
     delete_device()
-elif args.action == 'deleteDeviceAsync':
-    delete_device_async()
 else:
     parser.error("unknown action: " + args.action)
